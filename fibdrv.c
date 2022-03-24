@@ -6,6 +6,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
+#include "bignum.h"
 
 MODULE_LICENSE("Dual MIT/GPL");
 MODULE_AUTHOR("National Cheng Kung University, Taiwan");
@@ -24,9 +25,10 @@ static struct cdev *fib_cdev;
 static struct class *fib_class;
 static DEFINE_MUTEX(fib_mutex);
 
+/*
 static long long fib_sequence(long long k)
 {
-    /* FIXME: C99 variable-length array (VLA) is not allowed in Linux kernel. */
+    // FIXME: C99 variable-length array (VLA) is not allowed in Linux kernel.
     long long f[k + 2];
 
     f[0] = 0;
@@ -37,7 +39,7 @@ static long long fib_sequence(long long k)
     }
 
     return f[k];
-}
+}*/
 
 static int fib_open(struct inode *inode, struct file *file)
 {
@@ -60,7 +62,15 @@ static ssize_t fib_read(struct file *file,
                         size_t size,
                         loff_t *offset)
 {
-    return (ssize_t) fib_sequence(*offset);
+    bignum *fib = bn_init(1);
+    bn_fib_sequence(fib, *offset);
+    char *p = bn_to_str(fib);
+
+    size_t len = strlen(p) + 1;
+    size_t left = copy_to_user(buf, p, len);
+    bn_free(fib);
+    kfree(p);
+    return left;
 }
 
 /* write operation is skipped */
