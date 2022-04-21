@@ -18,28 +18,132 @@ MODULE_VERSION("0.1");
 /* MAX_LENGTH is set to 92 because
  * ssize_t can't fit the number > 92
  */
-#define MAX_LENGTH 92
+#define MAX_LENGTH 500
+
+#define TIME_PROXY(fib_f, result, k, timer)             \
+    ({                                                  \
+        timer = ktime_get();                            \
+        result = fib_f(k);                              \
+        timer = (size_t) ktime_sub(ktime_get(), timer); \
+    });
+
+#define BN_TIME_PROXY(fib_f, result, k, timer)          \
+    ({                                                  \
+        timer = ktime_get();                            \
+        fib_f(result, *offset);                         \
+        timer = (size_t) ktime_sub(ktime_get(), timer); \
+    });
+
+/*  0 normal
+ *  1 bignum
+ */
+#define NUM_MODE 0
 
 static dev_t fib_dev = 0;
 static struct cdev *fib_cdev;
 static struct class *fib_class;
 static DEFINE_MUTEX(fib_mutex);
 
-/*
+static ktime_t timer;
+
+static void escape(void *p)
+{
+    __asm__ volatile("" : : "g"(p) : "memory");
+}
+
+// the normal version of fib
 static long long fib_sequence(long long k)
 {
-    // FIXME: C99 variable-length array (VLA) is not allowed in Linux kernel.
-    long long f[k + 2];
+    if (k == 0)
+        return 0;
+    else if (k <= 2)
+        return 1;
 
-    f[0] = 0;
-    f[1] = 1;
+    unsigned long long a, b;
+    a = 0;
+    b = 1;
 
     for (int i = 2; i <= k; i++) {
-        f[i] = f[i - 1] + f[i - 2];
+        unsigned long long temp = a + b;
+        a = b;
+        b = temp;
     }
 
-    return f[k];
-}*/
+    return b;
+}
+
+static long long fib_fastdoubling(long long n)
+{
+    if (n == 0)
+        return 0;
+    else if (n <= 2)
+        return 1;
+    // The position of the highest bit of n.
+    // So we need to loop `h` times to get the answer.
+    // Example: n = (Dec)50 = (Bin)00110010, then h = 6.
+    //                               ^ 6th bit from right side
+    unsigned int h = 0;
+    for (unsigned int i = n; i; ++h, i >>= 1)
+        ;
+
+    uint64_t a = 0;  // F(0) = 0
+    uint64_t b = 1;  // F(1) = 1
+    // There is only one `1` in the bits of `mask`. The `1`'s position is same
+    // as the highest bit of n(mask = 2^(h-1) at first), and it will be shifted
+    // right iteratively to do `AND` operation with `n` to check `n_j` is odd or
+    // even, where n_j is defined below.
+    for (unsigned int mask = 1 << (h - 1); mask; mask >>= 1) {  // Run h times!
+        // Let j = h-i (looping from i = 1 to i = h), n_j = floor(n / 2^j) = n
+        // >> j (n_j = n when j = 0), k = floor(n_j / 2), then a = F(k), b =
+        // F(k+1) now.
+        uint64_t c = a * (2 * b - a);  // F(2k) = F(k) * [ 2 * F(k+1) – F(k) ]
+        uint64_t d = a * a + b * b;    // F(2k+1) = F(k)^2 + F(k+1)^2
+
+        if (mask & n) {  // n_j is odd: k = (n_j-1)/2 => n_j = 2k + 1
+            a = d;       //   F(n_j) = F(2k + 1)
+            b = c + d;   //   F(n_j + 1) = F(2k + 2) = F(2k) + F(2k + 1)
+        } else {         // n_j is even: k = n_j/2 => n_j = 2k
+            a = c;       //   F(n_j) = F(2k)
+            b = d;       //   F(n_j + 1) = F(2k + 1)
+        }
+    }
+
+    return a;
+}
+
+
+// the normal version of fib
+static long long fib_clz_fastdoubling(long long k)
+{
+    if (k == 0)
+        return 0;
+    else if (k <= 2)
+        return 1;
+
+    uint64_t a = 0;  // F(0) = 0
+    uint64_t b = 1;  // F(1) = 1
+    // There is only one `1` in the bits of `mask`. The `1`'s position is same
+    // as the highest bit of n(mask = 2^(h-1) at first), and it will be shifted
+    // right iteratively to do `AND` operation with `n` to check `n_j` is odd or
+    // even, where n_j is defined below.
+    for (unsigned int mask = 1 << (31 - __builtin_clz(k)); mask;
+         mask >>= 1) {  // Run h times!
+        // Let j = h-i (looping from i = 1 to i = h), n_j = floor(n / 2^j) =
+        // n >> j (n_j = n when j = 0), k = floor(n_j / 2), then a = F(k),
+        // b = F(k+1) now.
+        uint64_t c = a * (2 * b - a);  // F(2k) = F(k) * [ 2 * F(k+1) – F(k) ]
+        uint64_t d = a * a + b * b;    // F(2k+1) = F(k)^2 + F(k+1)^2
+
+        if (mask & k) {  // n_j is odd: k = (n_j-1)/2 => n_j = 2k + 1
+            a = d;       //   F(n_j) = F(2k + 1)
+            b = c + d;   //   F(n_j + 1) = F(2k + 2) = F(2k) + F(2k + 1)
+        } else {         // n_j is even: k = n_j/2 => n_j = 2k
+            a = c;       //   F(n_j) = F(2k)
+            b = d;       //   F(n_j + 1) = F(2k + 1)
+        }
+    }
+    return a;
+}
 
 static int fib_open(struct inode *inode, struct file *file)
 {
@@ -62,24 +166,55 @@ static ssize_t fib_read(struct file *file,
                         size_t size,
                         loff_t *offset)
 {
-    bignum *fib = bn_init(1);
-    bn_fib_sequence(fib, *offset);
-    char *p = bn_to_str(fib);
+    if (NUM_MODE == 0) {
+        return (ssize_t) fib_clz_fastdoubling(*offset);
+    } else {
+        bignum *fib = bn_init(1);
+        bn_fib_sequence(fib, *offset);
+        char *p = bn_to_str(fib);
 
-    size_t len = strlen(p) + 1;
-    size_t left = copy_to_user(buf, p, len);
-    bn_free(fib);
-    kfree(p);
-    return left;
+        size_t len = strlen(p) + 1;
+        size_t left = copy_to_user(buf, p, len);
+        bn_free(fib);
+        kfree(p);
+        return left;
+    }
 }
 
-/* write operation is skipped */
+/*
+ * @ param size : the fibonacci mode
+ *
+ *
+ */
 static ssize_t fib_write(struct file *file,
                          const char *buf,
-                         size_t size,
+                         size_t mode,
                          loff_t *offset)
 {
-    return 1;
+    long long result = 0;
+    bignum *fib = bn_init(1);
+
+    escape(fib);
+    escape(&result);
+
+    switch (mode) {
+    case 0: /* noraml */
+        TIME_PROXY(fib_sequence, result, *offset, timer)
+        break;
+    case 1: /* fast doubling*/
+        TIME_PROXY(fib_fastdoubling, result, *offset, timer)
+        break;
+    case 2:
+        TIME_PROXY(fib_clz_fastdoubling, result, *offset, timer)
+        break;
+    case 3:
+        BN_TIME_PROXY(bn_fib_sequence, fib, *offset, timer)
+    default:
+        break;
+    }
+
+    bn_free(fib);
+    return (ssize_t) ktime_to_ns(timer);
 }
 
 static loff_t fib_device_lseek(struct file *file, loff_t offset, int orig)
