@@ -8,6 +8,7 @@
 #include <linux/mutex.h>
 #include "bignum.h"
 
+
 MODULE_LICENSE("Dual MIT/GPL");
 MODULE_AUTHOR("National Cheng Kung University, Taiwan");
 MODULE_DESCRIPTION("Fibonacci engine driver");
@@ -18,7 +19,7 @@ MODULE_VERSION("0.1");
 /* MAX_LENGTH is set to 92 because
  * ssize_t can't fit the number > 92
  */
-#define MAX_LENGTH 500
+#define MAX_LENGTH 92
 
 #define TIME_PROXY(fib_f, result, k, timer)             \
     ({                                                  \
@@ -42,7 +43,13 @@ MODULE_VERSION("0.1");
 static dev_t fib_dev = 0;
 static struct cdev *fib_cdev;
 static struct class *fib_class;
+static int ratio = 0;
+
+#define MUTEX
+
+#ifdef MUTEX
 static DEFINE_MUTEX(fib_mutex);
+#endif
 
 static ktime_t timer;
 
@@ -147,16 +154,22 @@ static long long fib_clz_fastdoubling(long long k)
 
 static int fib_open(struct inode *inode, struct file *file)
 {
+#ifdef MUTEX
     if (!mutex_trylock(&fib_mutex)) {
         printk(KERN_ALERT "fibdrv is in use");
         return -EBUSY;
     }
+#endif
+    ratio = 0;
     return 0;
 }
 
 static int fib_release(struct inode *inode, struct file *file)
 {
+    ratio = 0;
+#ifdef MUTEX
     mutex_unlock(&fib_mutex);
+#endif
     return 0;
 }
 
@@ -166,8 +179,10 @@ static ssize_t fib_read(struct file *file,
                         size_t size,
                         loff_t *offset)
 {
+    ratio += 1;
+
     if (NUM_MODE == 0) {
-        return (ssize_t) fib_clz_fastdoubling(*offset);
+        return (ssize_t) fib_sequence(*offset) * ratio;
     } else {
         bignum *fib = bn_init(1);
         bn_fib_sequence(fib, *offset);
@@ -252,9 +267,9 @@ const struct file_operations fib_fops = {
 static int __init init_fib_dev(void)
 {
     int rc = 0;
-
+#ifdef MUTEX
     mutex_init(&fib_mutex);
-
+#endif
     // Let's register the device
     // This will dynamically allocate the major number
     rc = alloc_chrdev_region(&fib_dev, 0, 1, DEV_FIBONACCI_NAME);
@@ -306,7 +321,9 @@ failed_cdev:
 
 static void __exit exit_fib_dev(void)
 {
+#ifdef MUTEX
     mutex_destroy(&fib_mutex);
+#endif
     device_destroy(fib_class, fib_dev);
     class_destroy(fib_class);
     cdev_del(fib_cdev);

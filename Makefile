@@ -11,8 +11,8 @@ PWD := $(shell pwd)
 
 GIT_HOOKS := .git/hooks/applied
 
-all: $(GIT_HOOKS) client client_test
-	$(MAKE) -C $(KDIR) M=$(PWD) modules
+all: $(GIT_HOOKS) client client_test 
+	$(MAKE)  -C $(KDIR) M=$(PWD) modules
 
 $(GIT_HOOKS):
 	@scripts/install-git-hooks
@@ -20,7 +20,7 @@ $(GIT_HOOKS):
 
 clean:
 	$(MAKE) -C $(KDIR) M=$(PWD) clean
-	$(RM) client client_test out
+	$(RM) client client_test out multi_thread
 load:
 	sudo insmod $(TARGET_MODULE).ko
 unload:
@@ -29,8 +29,8 @@ unload:
 client: client.c
 	$(CC) -o $@ $^
 
-client_test: client_test.c
-	$(CC) -o $@ $^
+multi_thread: multi_thread.c
+	$(CC) -pthread -o $@ $^
 
 PRINTF = env printf
 PASS_COLOR = \e[32;01m
@@ -50,4 +50,10 @@ test: all
 	$(MAKE) load
 	sudo sh performance.sh
 	python3 scripts/plot_runtime.py
+	$(MAKE) unload
+
+multi_thread_test: all multi_thread
+	$(MAKE) unload
+	$(MAKE) load
+	sudo ./multi_thread > out
 	$(MAKE) unload
