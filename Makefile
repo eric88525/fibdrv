@@ -2,7 +2,7 @@ CONFIG_MODULE_SIG = n
 TARGET_MODULE := fibdrv_bn
 
 obj-m += $(TARGET_MODULE).o
-$(TARGET_MODULE)-objs := fibdrv.o bignum.o
+$(TARGET_MODULE)-objs := fibdrv.o mybignum.o
 
 ccflags-y := -std=gnu99 -Wno-declaration-after-statement
 
@@ -11,7 +11,7 @@ PWD := $(shell pwd)
 
 GIT_HOOKS := .git/hooks/applied
 
-all: $(GIT_HOOKS) client client_test 
+all: $(GIT_HOOKS) client client_test
 	$(MAKE)  -C $(KDIR) M=$(PWD) modules
 
 $(GIT_HOOKS):

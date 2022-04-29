@@ -6,7 +6,9 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
-#include "bignum.h"
+
+#include "mybignum.h"
+
 
 
 MODULE_LICENSE("Dual MIT/GPL");
@@ -43,7 +45,6 @@ MODULE_VERSION("0.1");
 static dev_t fib_dev = 0;
 static struct cdev *fib_cdev;
 static struct class *fib_class;
-static int ratio = 0;
 
 #define MUTEX
 
@@ -160,13 +161,11 @@ static int fib_open(struct inode *inode, struct file *file)
         return -EBUSY;
     }
 #endif
-    ratio = 0;
     return 0;
 }
 
 static int fib_release(struct inode *inode, struct file *file)
 {
-    ratio = 0;
 #ifdef MUTEX
     mutex_unlock(&fib_mutex);
 #endif
@@ -179,10 +178,8 @@ static ssize_t fib_read(struct file *file,
                         size_t size,
                         loff_t *offset)
 {
-    ratio += 1;
-
     if (NUM_MODE == 0) {
-        return (ssize_t) fib_sequence(*offset) * ratio;
+        return (ssize_t) fib_sequence(*offset);
     } else {
         bignum *fib = bn_init(1);
         bn_fib_sequence(fib, *offset);
@@ -224,6 +221,8 @@ static ssize_t fib_write(struct file *file,
         break;
     case 3:
         BN_TIME_PROXY(bn_fib_sequence, fib, *offset, timer)
+    case 4:
+
     default:
         break;
     }
