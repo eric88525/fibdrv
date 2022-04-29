@@ -181,13 +181,13 @@ static ssize_t fib_read(struct file *file,
     if (NUM_MODE == 0) {
         return (ssize_t) fib_sequence(*offset);
     } else {
-        bignum *fib = bn_init(1);
-        bn_fib_sequence(fib, *offset);
-        char *p = bn_to_str(fib);
+        bignum *fib = my_bn_init(1);
+        my_bn_fib_sequence(fib, *offset);
+        char *p = my_bn_to_str(fib);
 
         size_t len = strlen(p) + 1;
         size_t left = copy_to_user(buf, p, len);
-        bn_free(fib);
+        my_bn_free(fib);
         kfree(p);
         return left;
     }
@@ -204,7 +204,7 @@ static ssize_t fib_write(struct file *file,
                          loff_t *offset)
 {
     long long result = 0;
-    bignum *fib = bn_init(1);
+    bignum *fib = my_bn_init(1);
 
     escape(fib);
     escape(&result);
@@ -220,14 +220,14 @@ static ssize_t fib_write(struct file *file,
         TIME_PROXY(fib_clz_fastdoubling, result, *offset, timer)
         break;
     case 3:
-        BN_TIME_PROXY(bn_fib_sequence, fib, *offset, timer)
+        BN_TIME_PROXY(my_bn_fib_sequence, fib, *offset, timer)
     case 4:
 
     default:
         break;
     }
 
-    bn_free(fib);
+    my_bn_free(fib);
     return (ssize_t) ktime_to_ns(timer);
 }
 

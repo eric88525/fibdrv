@@ -4,7 +4,7 @@
 
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
 
-bignum *bn_init(size_t size)
+bignum *my_bn_init(size_t size)
 {
     // create bn obj
     bignum *new_bn = kmalloc(sizeof(bignum), GFP_KERNEL);
@@ -21,15 +21,15 @@ bignum *bn_init(size_t size)
 }
 
 // create bignum from int
-bignum *bn_from_int(int x)
+bignum *my_bn_from_int(int x)
 {
     if (x < 10) {
-        bignum *result = bn_init(1);
+        bignum *result = my_bn_init(1);
         result->number[0] = x;
         return result;
     }
 
-    bignum *result = bn_init(10);
+    bignum *result = my_bn_init(10);
 
     size_t size = 0;
 
@@ -38,12 +38,12 @@ bignum *bn_from_int(int x)
         x /= 10;
         size++;
     }
-    bn_resize(result, size);
+    my_bn_resize(result, size);
     return result;
 }
 
 // resize bignum to target size
-int bn_resize(bignum *src, size_t size)
+int my_bn_resize(bignum *src, size_t size)
 {
     if (!src)
         return -1;
@@ -52,7 +52,7 @@ int bn_resize(bignum *src, size_t size)
         return 0;
 
     if (size == 0)  // prevent krealloc(0) = kfree, which will cause problem
-        return bn_free(src);
+        return my_bn_free(src);
 
     src->number = krealloc(src->number, size, GFP_KERNEL);
 
@@ -67,7 +67,7 @@ int bn_resize(bignum *src, size_t size)
 }
 
 // add two bignum and store at result
-void bn_add(bignum *a, bignum *b, bignum *result)
+void my_bn_add(bignum *a, bignum *b, bignum *result)
 {
     if (a->sign && !b->sign) {  // a neg, b pos, do b-a
         return;
@@ -77,7 +77,7 @@ void bn_add(bignum *a, bignum *b, bignum *result)
 
     // pre caculate how many digits that result need
     int digit_width = MAX(a->size, b->size) + 1;
-    bn_resize(result, digit_width);
+    my_bn_resize(result, digit_width);
 
     unsigned char carry = 0;  // store add carry
 
@@ -94,14 +94,14 @@ void bn_add(bignum *a, bignum *b, bignum *result)
     if (carry) {
         result->number[digit_width - 1] = 1;
     } else {
-        bn_resize(result, digit_width - 1);
+        my_bn_resize(result, digit_width - 1);
     }
 
     result->sign = a->sign;
 }
 
 // bn to string
-char *bn_to_str(bignum *src)
+char *my_bn_to_str(bignum *src)
 {
     size_t len = sizeof(char) * src->size + 1;
     char *p = kmalloc(len, GFP_KERNEL);
@@ -115,7 +115,7 @@ char *bn_to_str(bignum *src)
 }
 
 // free bignum
-int bn_free(bignum *src)
+int my_bn_free(bignum *src)
 {
     if (src == NULL)
         return -1;
@@ -124,41 +124,41 @@ int bn_free(bignum *src)
     return 0;
 }
 
-void bn_swap(bignum *a, bignum *b)
+void my_bn_swap(bignum *a, bignum *b)
 {
     bignum tmp = *a;
     *a = *b;
     *b = tmp;
 }
 
-/*int bn_cpy(bignum *dest, bignum *src)
+/*int my_bn_cpy(bignum *dest, bignum *src)
 {
-    if (bn_resize(dest, src->size) < 0)
+    if (my_bn_resize(dest, src->size) < 0)
         return -1;
     dest->sign = src->sign;
     memcpy(dest->number, src->number, src->size * sizeof(int));
     return 0;
 }*/
 
-void bn_fib_sequence(bignum *dest, long long k)
+void my_bn_fib_sequence(bignum *dest, long long k)
 {
-    bn_resize(dest, 1);
+    my_bn_resize(dest, 1);
 
     if (k < 2) {
         dest->number[0] = k;
         return;
     }
 
-    bignum *a = bn_from_int(0);
-    bignum *b = bn_from_int(0);
+    bignum *a = my_bn_from_int(0);
+    bignum *b = my_bn_from_int(0);
     dest->number[0] = 1;
 
     for (int i = 2; i <= k; i++) {
-        bn_swap(b, dest);
-        bn_add(a, b, dest);
-        bn_swap(a, b);
+        my_bn_swap(b, dest);
+        my_bn_add(a, b, dest);
+        my_bn_swap(a, b);
     }
 
-    bn_free(a);
-    bn_free(b);
+    my_bn_free(a);
+    my_bn_free(b);
 }

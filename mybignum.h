@@ -12,32 +12,29 @@ typedef struct __bignum {
 } bignum;
 
 // create bignum
-bignum *bn_init(size_t size);
+bignum *my_bn_init(size_t size);
 
 // create bignum from int
-bignum *bn_from_int(int x);
+bignum *my_bn_from_int(int x);
 
 // resize bignum to target size
-int bn_resize(bignum *src, size_t size);
-
-// convert bignum to string
-char *to_string(bignum *a);
+int my_bn_resize(bignum *src, size_t size);
 
 // add two bignum
-void bn_add(bignum *a, bignum *b, bignum *result);
+void my_bn_add(bignum *a, bignum *b, bignum *result);
 
 // bn to string
-char *bn_to_str(bignum *src);
+char *my_bn_to_str(bignum *src);
 
 // free bignum
-int bn_free(bignum *src);
+int my_bn_free(bignum *src);
 
 // copy src to dest
-int bn_cpy(bignum *dest, bignum *src);
+int my_bn_cpy(bignum *dest, bignum *src);
 
-void bn_swap(bignum *a, bignum *b);
+void my_bn_swap(bignum *a, bignum *b);
 
-void bn_fib_sequence(bignum *dest, long long k);
+void my_bn_fib_sequence(bignum *dest, long long k);
 
 
 #endif
