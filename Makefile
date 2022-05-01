@@ -2,7 +2,14 @@ CONFIG_MODULE_SIG = n
 TARGET_MODULE := fibdrv_bn
 
 obj-m += $(TARGET_MODULE).o
-$(TARGET_MODULE)-objs := fibdrv.o mybignum.o
+$(TARGET_MODULE)-objs := \
+	fibdrv.o \
+	mybignum.o \
+	bignum.o \
+	apm.o \
+	sqr.o \
+	mul.o \
+	format.o \
 
 ccflags-y := -std=gnu99 -Wno-declaration-after-statement
 
@@ -43,7 +50,6 @@ check: all
 	sudo ./client > out
 	$(MAKE) unload
 	@scripts/verify.py
-
 
 test: all
 	$(MAKE) unload

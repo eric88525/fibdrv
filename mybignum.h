@@ -34,7 +34,13 @@ int my_bn_cpy(bignum *dest, bignum *src);
 
 void my_bn_swap(bignum *a, bignum *b);
 
-void my_bn_fib_sequence(bignum *dest, long long k);
+void my_bn_fib_sequence(long long k, bignum *dest);
+
+// result = a / b
+void my_bn_divid(bignum *a, bignum *b, bignum *result);
+
+// result = a * b
+void my_bn_mul(bignum *a, bignum *b, bignum *result);
 
 
 #endif

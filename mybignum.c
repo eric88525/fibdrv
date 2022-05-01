@@ -140,7 +140,7 @@ void my_bn_swap(bignum *a, bignum *b)
     return 0;
 }*/
 
-void my_bn_fib_sequence(bignum *dest, long long k)
+void my_bn_fib_sequence(long long k, bignum *dest)
 {
     my_bn_resize(dest, 1);
 
@@ -150,7 +150,7 @@ void my_bn_fib_sequence(bignum *dest, long long k)
     }
 
     bignum *a = my_bn_from_int(0);
-    bignum *b = my_bn_from_int(0);
+    bignum *b = my_bn_from_int(1);
     dest->number[0] = 1;
 
     for (int i = 2; i <= k; i++) {

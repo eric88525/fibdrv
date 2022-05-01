@@ -26,15 +26,15 @@ def data_processing(data):
 
 def main():
 
-    datas = []
+    datas = {}
     runtime = 50
     fib_modes = ["iteration", "fast_doubling",
-                 "clz_fast_doubling", "bn_normal", "bn_fast_doubling"]
+                 "clz_fast_doubling", "my_bn_iteration", "ref_bn_iteration", "ref_bn_doubling"]
 
     # run program for runtime
-    modes = 3
+    modes = [3, 4, 5]
     # run test for every mode
-    for mode in range(modes):
+    for mode in modes:
         temp = []
         # run test on each mode for runtime
         for _ in range(runtime):
@@ -43,14 +43,14 @@ def main():
             _data = np.loadtxt("runtime.txt", dtype=float)
             temp.append(_data)
         temp = data_processing(temp)
-        datas.append(temp)
+        datas[mode] = temp
 
     # plot
     _, ax = plt.subplots()
     plt.grid()
-    for i, data in enumerate(datas):
-        ax.plot(np.arange(data.shape[-1]),
-                data, marker='+',  markersize=3, label=fib_modes[i])
+    for k, v in datas.items():
+        ax.plot(np.arange(datas[k].shape[-1]),
+                datas[k], marker='+',  markersize=3, label=fib_modes[k])
     plt.legend(loc='upper left')
     plt.ylabel("kernel runtime (ns)")
     plt.xlabel("F(n)")

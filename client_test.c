@@ -7,7 +7,7 @@
 
 #define FIB_DEV "/dev/fibonacci"
 #define BUFF_SIZE 100
-
+#define OFFSET 500
 
 
 int main(int argc, char *argv[])
@@ -26,14 +26,13 @@ int main(int argc, char *argv[])
 
 
     char buf[BUFF_SIZE];
-    int offset = 93;
 
     int fd = open(FIB_DEV, O_RDWR);
     if (fd < 0) {
         perror("Failed to open character device");
         exit(1);
     }
-    for (int i = 0; i <= offset; i++) {
+    for (int i = 0; i <= OFFSET; i++) {
         lseek(fd, i, SEEK_SET);
         long long sz = write(fd, buf, mode);
         printf("%lld ", sz);

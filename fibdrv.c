@@ -7,8 +7,9 @@
 #include <linux/module.h>
 #include <linux/mutex.h>
 
+#include "bn.h"
+#include "fibonacci.h"
 #include "mybignum.h"
-
 
 
 MODULE_LICENSE("Dual MIT/GPL");
@@ -21,7 +22,7 @@ MODULE_VERSION("0.1");
 /* MAX_LENGTH is set to 92 because
  * ssize_t can't fit the number > 92
  */
-#define MAX_LENGTH 92
+#define MAX_LENGTH 500
 
 #define TIME_PROXY(fib_f, result, k, timer)             \
     ({                                                  \
@@ -33,14 +34,9 @@ MODULE_VERSION("0.1");
 #define BN_TIME_PROXY(fib_f, result, k, timer)          \
     ({                                                  \
         timer = ktime_get();                            \
-        fib_f(result, *offset);                         \
+        fib_f(*offset, result);                         \
         timer = (size_t) ktime_sub(ktime_get(), timer); \
     });
-
-/*  0 normal
- *  1 bignum
- */
-#define NUM_MODE 0
 
 static dev_t fib_dev = 0;
 static struct cdev *fib_cdev;
@@ -52,6 +48,7 @@ static struct class *fib_class;
 static DEFINE_MUTEX(fib_mutex);
 #endif
 
+// the timer to caculate lernel fib runtime
 static ktime_t timer;
 
 static void escape(void *p)
@@ -178,19 +175,34 @@ static ssize_t fib_read(struct file *file,
                         size_t size,
                         loff_t *offset)
 {
-    if (NUM_MODE == 0) {
+    if (size == 0) {
         return (ssize_t) fib_sequence(*offset);
-    } else {
+    } else if (size == 1) {
         bignum *fib = my_bn_init(1);
-        my_bn_fib_sequence(fib, *offset);
+        my_bn_fib_sequence(*offset, fib);
         char *p = my_bn_to_str(fib);
-
         size_t len = strlen(p) + 1;
         size_t left = copy_to_user(buf, p, len);
         my_bn_free(fib);
         kfree(p);
         return left;
+    } else if (size == 2) {
+        bn_t fib;
+        bn_init(fib);
+        // ref_fd_fibonacci(*offset, fib);
+
+        ref_fibonacci(*offset, fib);
+        char *p = kmalloc(100, GFP_KERNEL);
+        bn_snprint(fib, 10, p, 99);
+
+        size_t left = copy_to_user(buf, p, strlen(p) + 1);
+
+        bn_free(fib);
+        kfree(p);
+
+        return left;
     }
+    return 0;
 }
 
 /*
@@ -205,9 +217,12 @@ static ssize_t fib_write(struct file *file,
 {
     long long result = 0;
     bignum *fib = my_bn_init(1);
+    bn_t ref_fib = BN_INITIALIZER;
+
 
     escape(fib);
     escape(&result);
+    escape(ref_fib);
 
     switch (mode) {
     case 0: /* noraml */
@@ -216,18 +231,27 @@ static ssize_t fib_write(struct file *file,
     case 1: /* fast doubling*/
         TIME_PROXY(fib_fastdoubling, result, *offset, timer)
         break;
-    case 2:
+    case 2: /*clz + fast doubling*/
         TIME_PROXY(fib_clz_fastdoubling, result, *offset, timer)
         break;
-    case 3:
+    case 3: /* my implementaion of bignum*/
         BN_TIME_PROXY(my_bn_fib_sequence, fib, *offset, timer)
-    case 4:
-
+        break;
+    case 4: /* teacher's implementaion bn + fib*/
+        BN_TIME_PROXY(ref_fibonacci, ref_fib, *offset, timer);
+        break;
+    case 5: /* teacher's implementaion bn +  fast doubling*/
+        BN_TIME_PROXY(ref_fd_fibonacci, ref_fib, *offset, timer);
+        break;
     default:
+        my_bn_free(fib);
+        bn_free(ref_fib);
+        return (ssize_t) 0;
         break;
     }
 
     my_bn_free(fib);
+    bn_free(ref_fib);
     return (ssize_t) ktime_to_ns(timer);
 }
 
